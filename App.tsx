@@ -1,11 +1,11 @@
 
 import React, { useState, useEffect } from 'react';
-import { ViewMode, Candidate, Vote } from './types';
-import VotingScreen from './components/VotingScreen';
-import Keypad from './components/Keypad';
-import AdminDashboard from './components/AdminDashboard';
-import { audioService } from './services/audioService';
-import * as db from './services/supabase';
+import { ViewMode, Candidate, Vote } from './types.ts';
+import VotingScreen from './components/VotingScreen.tsx';
+import Keypad from './components/Keypad.tsx';
+import AdminDashboard from './components/AdminDashboard.tsx';
+import { audioService } from './services/audioService.ts';
+import * as db from './services/supabase.ts';
 import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'wfsteca1';
@@ -195,7 +195,6 @@ const App: React.FC = () => {
                 <VotingScreen number={currentNumber} candidate={selectedCandidate} isBranco={isBranco} isNulo={isNulo} isVoted={isVoted} />
               </div>
               <div className="flex flex-col items-center lg:pt-8">
-                {/* Caixa de identificação aumentada em 40% (p-4 -> p-[22px], text-[9px] -> text-[13px]) e ano atualizado para 2026 */}
                 <div className="mb-8 text-center border-2 border-gray-400 p-[22px] bg-gray-200/50 rounded-sm">
                    <div className="text-gray-500 text-[13px] font-bold uppercase tracking-[0.2em]">CIPA 2026</div>
                 </div>

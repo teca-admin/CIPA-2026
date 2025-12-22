@@ -56,7 +56,6 @@
             pointer-events: none;
             z-index: 10;
         }
-        /* Custom scrollbar for Admin */
         ::-webkit-scrollbar {
             width: 8px;
         }
@@ -66,9 +65,6 @@
         ::-webkit-scrollbar-thumb {
             background: #cbd5e1;
             border-radius: 4px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: #94a3b8;
         }
     </style>
 <script type="importmap">
@@ -87,5 +83,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <!-- Inclusão explícita do script do módulo -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>

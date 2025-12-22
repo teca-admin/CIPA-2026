@@ -1,9 +1,9 @@
 
 import React, { useState, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
-import { Candidate, Vote } from '../types';
+import { Candidate, Vote } from '../types.ts';
 import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle } from 'lucide-react';
-import { sanitizeImageUrl } from '../utils/urlHelper';
+import { sanitizeImageUrl } from '../utils/urlHelper.ts';
 
 interface AdminDashboardProps {
   candidates: Candidate[];
@@ -32,7 +32,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     name: c.name,
     number: c.number,
     votes: votes.filter(v => v.candidateNumber === c.number).length,
-    color: '#6366f1' // Indigo padrão profissional
+    color: '#6366f1'
   }));
 
   const chartData = [
@@ -73,7 +73,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="flex flex-col h-screen bg-[#f8fafc] overflow-hidden">
-      {/* Top Bar Profissional */}
       <div className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4">
           <div className="bg-slate-900 p-2 rounded-md text-white">
@@ -107,11 +106,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-[1600px] mx-auto grid grid-cols-12 gap-8">
-          
-          {/* Coluna Central: Gráficos e Listagem */}
           <div className="col-span-12 lg:col-span-8 space-y-8">
-            
-            {/* Bloco de Apuração */}
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                 <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -154,7 +149,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
             </div>
 
-            {/* Bloco de Candidatos (Estilo Tabela) */}
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                 <h2 className="text-sm font-bold text-slate-700">Candidatos Registrados</h2>
@@ -208,7 +202,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           </div>
 
-          {/* Coluna Direita: Formulário Lateral */}
           <div className="col-span-12 lg:col-span-4">
             <div className="sticky top-8 bg-white border border-slate-200 rounded-lg shadow-sm p-6">
               <h2 className="text-sm font-bold text-slate-800 mb-6 flex items-center gap-2">

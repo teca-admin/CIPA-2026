@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { audioService } from '../services/audioService';
+import { audioService } from '../services/audioService.ts';
 
 interface KeypadProps {
   onNumberClick: (num: string) => void;
@@ -18,13 +18,13 @@ const Keypad: React.FC<KeypadProps> = ({ onNumberClick, onBranco, onCorrige, onC
   };
 
   return (
-    <div className="bg-[#212121] p-6 rounded-lg shadow-2xl flex flex-col gap-4 w-full max-w-sm">
-      <div className="grid grid-cols-3 gap-3">
+    <div className="bg-[#1f2937] p-8 rounded-sm shadow-[10px_10px_20px_rgba(0,0,0,0.5)] flex flex-col gap-6 w-full max-w-[340px] border-t-2 border-gray-600">
+      <div className="grid grid-cols-3 gap-x-6 gap-y-4">
         {buttons.slice(0, 9).map((num) => (
           <button
             key={num}
             onClick={() => handleKeyClick(num)}
-            className="bg-[#1a1a1a] text-white text-2xl font-bold py-4 rounded shadow-[0_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all border border-gray-700"
+            className="btn-teclado h-12 text-2xl font-bold"
           >
             {num}
           </button>
@@ -32,30 +32,29 @@ const Keypad: React.FC<KeypadProps> = ({ onNumberClick, onBranco, onCorrige, onC
         <div />
         <button
           onClick={() => handleKeyClick('0')}
-          className="bg-[#1a1a1a] text-white text-2xl font-bold py-4 rounded shadow-[0_4px_0_0_rgba(0,0,0,1)] active:shadow-none active:translate-y-1 transition-all border border-gray-700"
+          className="btn-teclado h-12 text-2xl font-bold"
         >
           0
         </button>
         <div />
       </div>
 
-      <div className="flex gap-2 mt-4 h-16">
+      <div className="grid grid-cols-3 gap-3 mt-4 h-16">
         <button
           disabled
-          className="flex-1 bg-gray-200 text-gray-400 text-xs font-bold uppercase p-2 rounded cursor-not-allowed opacity-50"
-          title="Votos em branco não são permitidos nesta eleição"
+          className="bg-white text-black text-[10px] font-bold uppercase p-2 rounded-sm shadow-md opacity-40 cursor-not-allowed flex items-end justify-center pb-2"
         >
           Branco
         </button>
         <button
           onClick={() => { audioService.playBeep(); onCorrige(); }}
-          className="flex-1 bg-[#f57c00] text-black text-xs font-bold uppercase p-2 rounded shadow-[0_4px_0_0_#e65100] active:shadow-none active:translate-y-1 transition-all"
+          className="bg-[#f06520] text-black text-[10px] font-bold uppercase p-2 rounded-sm shadow-md border-b-4 border-[#c04d16] active:border-b-0 active:translate-y-1 transition-all flex items-end justify-center pb-2"
         >
           Corrige
         </button>
         <button
           onClick={onConfirma}
-          className="flex-[1.5] bg-[#43a047] text-black text-sm font-bold uppercase p-2 rounded shadow-[0_4px_0_0_#2e7d32] active:shadow-none active:translate-y-1 transition-all h-20 -mt-4"
+          className="bg-[#00a651] text-black text-xs font-bold uppercase p-2 rounded-sm shadow-md border-b-4 border-[#007b3b] active:border-b-0 active:translate-y-1 transition-all h-20 -mt-4 flex items-end justify-center pb-3"
         >
           Confirma
         </button>
