@@ -46,7 +46,12 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-  }, []);
+    // Atualização automática em background a cada 10 segundos para o admin
+    const interval = setInterval(() => {
+      if (viewMode === ViewMode.ADMIN) loadData();
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [viewMode]);
 
   const handleNumberClick = (num: string) => {
     if (isVoted || isBranco || currentNumber.length >= 2) return;
@@ -70,12 +75,15 @@ const App: React.FC = () => {
       audioService.playConfirm();
       setIsVoted(true);
       await db.saveVote(foundCandidate.number);
+      // Recarrega dados imediatamente após o voto
       loadData();
+      
+      // AGUARDA 1 SEGUNDO CONFORME SOLICITADO
       setTimeout(() => {
         setIsVoted(false);
         setCurrentNumber('');
         setIsBranco(false);
-      }, 4000);
+      }, 1000);
     } catch (err: any) {
       alert('Erro ao registrar voto: ' + (err.message || 'Falha na conexão'));
       setIsVoted(false);
