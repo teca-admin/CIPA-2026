@@ -1,0 +1,5 @@
+{
+  "name": "Urna Eletrônica CIPA",
+  "description": "Uma urna eletrônica digital completa para eleições da CIPA, com interface de votação realista, sons tradicionais, gestão de candidatos e dashboard de resultados em tempo real.",
+  "requestFramePermissions": []
+}
