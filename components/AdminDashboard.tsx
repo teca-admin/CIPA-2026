@@ -93,7 +93,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         </div>
 
         <div className="flex items-center gap-6">
-          <div className="flex gap-6 border-r border-slate-200 pr-6">
+          {/* Botão Zerar Urna movido para a nova posição conforme solicitado */}
+          <button 
+            onClick={() => { if(confirm('⚠️ Atenção: Todos os votos serão removidos. Confirmar limpeza total?')) onResetVotes(); }} 
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md text-xs font-bold hover:bg-red-50 transition-colors shadow-sm"
+          >
+            <AlertTriangle className="w-4 h-4" /> Zerar Urna
+          </button>
+
+          <div className="flex gap-6 pl-2">
             <div className="text-right">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Votos Registrados</p>
               <p className="text-xl font-mono font-bold text-slate-900 leading-none">{votes.length}</p>
@@ -103,12 +111,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               <p className="text-xl font-mono font-bold text-slate-900 leading-none">{candidates.length}</p>
             </div>
           </div>
-          <button 
-            onClick={() => { if(confirm('⚠️ Atenção: Todos os votos serão removidos. Confirmar limpeza total?')) onResetVotes(); }} 
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md text-xs font-bold hover:bg-red-50 transition-colors"
-          >
-            <AlertTriangle className="w-4 h-4" /> Zerar Urna
-          </button>
         </div>
       </div>
 
@@ -209,7 +211,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
 
           {/* TAB: CANDIDATES LIST */}
-          {activeTab === 'candidates' && ( activeTab === 'candidates' && 
+          {activeTab === 'candidates' && ( 
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                 <h2 className="text-sm font-bold text-slate-700">Listagem Geral</h2>
