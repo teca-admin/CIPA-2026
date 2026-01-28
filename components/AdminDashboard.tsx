@@ -2,7 +2,7 @@
 import React, { useState, useRef } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { Candidate, Vote } from '../types.ts';
-import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3 } from 'lucide-react';
+import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp } from 'lucide-react';
 import { sanitizeImageUrl } from '../utils/urlHelper.ts';
 
 interface AdminDashboardProps {
@@ -29,13 +29,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Organiza dados do gráfico: Do maior para o menor
-  const stats = candidates.map(c => ({
-    name: c.name,
-    number: c.number,
-    votes: votes.filter(v => v.candidateNumber === c.number).length,
-    color: '#6366f1'
-  })).sort((a, b) => b.votes - a.votes);
+  // Total de votos para cálculo de porcentagem
+  const totalVotesCount = votes.length;
+
+  // Organiza dados: Do maior para o menor
+  const stats = candidates.map(c => {
+    const candidateVotes = votes.filter(v => v.candidateNumber === c.number).length;
+    return {
+      name: c.name,
+      number: c.number,
+      photoUrl: c.photoUrl,
+      votes: candidateVotes,
+      percentage: totalVotesCount > 0 ? ((candidateVotes / totalVotesCount) * 100).toFixed(1) : "0",
+      color: '#6366f1'
+    };
+  }).sort((a, b) => b.votes - a.votes);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,7 +74,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       setNewNumber('');
       setNewPhotoBase64('');
       if (fileInputRef.current) fileInputRef.current.value = '';
-      setActiveTab('candidates'); // Muda para lista após cadastrar
+      setActiveTab('candidates'); 
     }
   };
 
@@ -133,45 +141,66 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {/* TAB: RESULTS */}
           {activeTab === 'results' && (
             <div className="space-y-6">
-              <div className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
-                  <h2 className="text-sm font-bold text-slate-700">Classificação por Votos</h2>
+                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-indigo-500" />
+                    Resultados Consolidados
+                  </h2>
                   <div className="flex items-center gap-2 text-[10px] text-slate-400 uppercase font-bold">
                     <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    Dados em tempo real
+                    Tempo Real
                   </div>
                 </div>
-                <div className="p-10 h-[500px]">
+                
+                <div className="p-8">
                   {votes.length > 0 ? (
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={stats} layout="vertical" margin={{ left: 30, right: 60 }}>
-                        <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                        <XAxis type="number" hide />
-                        <YAxis 
-                          dataKey="name" 
-                          type="category" 
-                          width={140} 
-                          tick={{ fontSize: 12, fontWeight: 700, fill: '#334155' }} 
-                          axisLine={false}
-                          tickLine={false}
-                        />
-                        <Tooltip 
-                          cursor={{ fill: '#f8fafc' }}
-                          contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Bar dataKey="votes" radius={[0, 6, 6, 0]} barSize={32}>
-                          {stats.map((entry, index) => (
-                            <Cell key={`cell-${index}`} fill={index === 0 ? '#4f46e5' : '#818cf8'} />
-                          ))}
-                          {/* Exibição numérica direta na barra */}
-                          <LabelList dataKey="votes" position="right" style={{ fill: '#475569', fontSize: 14, fontWeight: '800', fontFamily: 'monospace' }} />
-                        </Bar>
-                      </BarChart>
-                    </ResponsiveContainer>
+                    <div className="space-y-4">
+                      {stats.map((item, index) => (
+                        <div key={item.number} className="flex items-center gap-6 group hover:bg-slate-50 p-2 rounded-lg transition-colors">
+                          {/* Candidato Info */}
+                          <div className="flex items-center gap-4 w-[280px] shrink-0">
+                            <div className="relative">
+                               <span className={`absolute -top-1 -left-1 w-5 h-5 flex items-center justify-center rounded-full text-[10px] font-black text-white z-10 ${index === 0 ? 'bg-amber-400 shadow-amber-200 shadow-lg' : 'bg-slate-400'}`}>
+                                 {index + 1}
+                               </span>
+                               <img 
+                                src={sanitizeImageUrl(item.photoUrl)} 
+                                className="w-12 h-14 object-cover rounded shadow-sm border border-slate-200 bg-slate-100"
+                                alt={item.name}
+                                onError={(e) => e.currentTarget.src = FALLBACK_PHOTO}
+                              />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-sm font-black text-slate-800 uppercase truncate leading-tight">{item.name}</p>
+                              <p className="text-[10px] font-bold text-slate-400 mt-0.5">Nº {item.number}</p>
+                            </div>
+                          </div>
+
+                          {/* Barra de Progresso */}
+                          <div className="flex-1 flex flex-col gap-1.5">
+                             <div className="flex justify-between items-end">
+                                <span className="text-[10px] font-black text-slate-500 uppercase tracking-tighter">
+                                   {item.votes} {item.votes === 1 ? 'voto' : 'votos'}
+                                </span>
+                                <span className="text-xs font-mono font-black text-indigo-600">
+                                   {item.percentage}%
+                                </span>
+                             </div>
+                             <div className="w-full bg-slate-100 h-3.5 rounded-full overflow-hidden">
+                                <div 
+                                  className={`h-full transition-all duration-1000 ease-out rounded-full ${index === 0 ? 'bg-indigo-600' : 'bg-indigo-400'}`}
+                                  style={{ width: `${item.percentage}%` }}
+                                ></div>
+                             </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   ) : (
-                    <div className="h-full flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-lg">
+                    <div className="h-[400px] flex flex-col items-center justify-center text-slate-400 border-2 border-dashed border-slate-100 rounded-xl">
                       <VoteIcon className="w-16 h-16 mb-4 opacity-10" />
-                      <p className="text-sm font-medium">Nenhum voto computado até o momento.</p>
+                      <p className="text-sm font-medium">Aguardando computação do primeiro voto.</p>
                     </div>
                   )}
                 </div>
@@ -180,7 +209,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           )}
 
           {/* TAB: CANDIDATES LIST */}
-          {activeTab === 'candidates' && (
+          {activeTab === 'candidates' && ( activeTab === 'candidates' && 
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                 <h2 className="text-sm font-bold text-slate-700">Listagem Geral</h2>
