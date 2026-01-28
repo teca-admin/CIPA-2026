@@ -1,10 +1,9 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Candidate, Vote } from '../types';
+import { Candidate, Vote } from '../types.ts';
 
-// As credenciais são injetadas automaticamente ou mantidas conforme configurado
-const SUPABASE_URL = 'https://manriddiwsjtlcnuxnin.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1hbnJpZGRpd3NqdGxjbnV4bmluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MzE3NTIsImV4cCI6MjA4MjAwNzc1Mn0.F_D2cbbIJQgkMyQm3sruXGLGfqCOttpI-Hll8x4_G1g';
+const SUPABASE_URL = 'https://hxwiuxpqvowahmcfnreg.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4d2l1eHBxdm93YWhtY2ZucmVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5MDg0MDMsImV4cCI6MjA4NDQ4NDQwM30.Z3l4vSAhLHmyZE-ZUfBZ69Qh-agfiu7ePjjzziw_36Y';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -25,7 +24,7 @@ export const getCandidates = async (): Promise<Candidate[]> => {
     }));
   } catch (error: any) {
     console.error('Erro ao buscar candidatos:', error);
-    throw new Error(`Erro de Banco: ${error.message || 'Verifique se a tabela "candidates" existe e o RLS está desativado.'}`);
+    throw new Error(`Erro de Banco: ${error.message || 'Verifique se a tabela "candidates" existe no novo Supabase.'}`);
   }
 };
 
@@ -72,7 +71,7 @@ export const getVotes = async (): Promise<Vote[]> => {
     }));
   } catch (error: any) {
     console.error('Erro ao buscar votos:', error);
-    throw new Error(`Erro de Banco: ${error.message || 'Verifique se a tabela "votes" existe.'}`);
+    throw new Error(`Erro de Banco: ${error.message}`);
   }
 };
 
@@ -88,11 +87,10 @@ export const saveVote = async (candidateNumber: string) => {
 };
 
 export const clearAllVotes = async () => {
-  // Truque para deletar tudo sem filtro (Supabase exige um filtro)
   const { error } = await supabase
     .from('votes')
     .delete()
-    .neq('id', '00000000-0000-0000-0000-000000000000'); // UUID impossível
+    .neq('id', '00000000-0000-0000-0000-000000000000');
   
   if (error) {
     console.error('Erro ao resetar votos:', error);
