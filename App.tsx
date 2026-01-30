@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { ViewMode, Candidate, Vote } from './types.ts';
 import VotingScreen from './components/VotingScreen.tsx';
 import Keypad from './components/Keypad.tsx';
@@ -46,25 +46,26 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    // Atualização automática em background a cada 10 segundos para o admin
     const interval = setInterval(() => {
       if (viewMode === ViewMode.ADMIN) loadData();
     }, 10000);
     return () => clearInterval(interval);
   }, [viewMode]);
 
-  const handleNumberClick = (num: string) => {
+  const handleNumberClick = useCallback((num: string) => {
     if (isVoted || isBranco || currentNumber.length >= 2) return;
+    audioService.playBeep();
     setCurrentNumber(prev => prev + num);
-  };
+  }, [isVoted, isBranco, currentNumber.length]);
 
-  const handleCorrige = () => {
+  const handleCorrige = useCallback(() => {
     if (isVoted) return;
+    audioService.playBeep();
     setCurrentNumber('');
     setIsBranco(false);
-  };
+  }, [isVoted]);
 
-  const handleConfirma = async () => {
+  const handleConfirma = useCallback(async () => {
     if (isVoted) return;
     const foundCandidate = candidates.find(c => c.number === currentNumber);
     if (!foundCandidate) {
@@ -75,10 +76,8 @@ const App: React.FC = () => {
       audioService.playConfirm();
       setIsVoted(true);
       await db.saveVote(foundCandidate.number);
-      // Recarrega dados imediatamente após o voto
       loadData();
       
-      // AGUARDA 1 SEGUNDO CONFORME SOLICITADO
       setTimeout(() => {
         setIsVoted(false);
         setCurrentNumber('');
@@ -88,7 +87,28 @@ const App: React.FC = () => {
       alert('Erro ao registrar voto: ' + (err.message || 'Falha na conexão'));
       setIsVoted(false);
     }
-  };
+  }, [isVoted, candidates, currentNumber]);
+
+  // Listener para teclado físico
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Só processa se estiver na Urna e não estiver logando/erro
+      if (viewMode !== ViewMode.VOTING || showLogin || isLoading || !!errorMessage || isVoted) return;
+
+      const key = e.key;
+
+      if (/^[0-9]$/.test(key)) {
+        handleNumberClick(key);
+      } else if (key === 'Enter') {
+        handleConfirma();
+      } else if (key === 'Backspace' || key === 'Delete' || key === 'Escape') {
+        handleCorrige();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige]);
 
   const addCandidate = async (c: Omit<Candidate, 'id'>) => {
     try {
