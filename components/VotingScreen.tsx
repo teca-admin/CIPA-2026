@@ -39,7 +39,7 @@ const VotingScreen: React.FC<VotingScreenProps> = ({ number, candidate, isBranco
                 {[0, 1].map((idx) => (
                   <div key={idx} className="w-10 h-14 border-[1px] border-black flex items-center justify-center text-4xl font-bold bg-transparent">
                     {number[idx] || ''}
-                    {number.length === idx && <span className="animate-[pulse_0.5s_infinite]">|</span>}
+                    {number.length === idx && !isNulo && <span className="animate-[pulse_0.5s_infinite]">|</span>}
                   </div>
                 ))}
               </div>
@@ -54,10 +54,13 @@ const VotingScreen: React.FC<VotingScreenProps> = ({ number, candidate, isBranco
               </div>
             )}
 
-            {isNulo && number.length === 2 && (
-              <div className="mt-4 flex flex-col">
-                 <h2 className="text-2xl font-black bg-[#1a1a1a] text-[#f1f3f1] px-2 py-1 inline-block w-fit">NÚMERO ERRADO</h2>
-                 <h2 className="text-xs font-bold uppercase mt-2 text-red-800">Por favor, Selecione um dos candidatos</h2>
+            {isNulo && (
+              <div className="mt-4 flex flex-col animate-pulse">
+                 <h2 className="text-2xl font-black bg-[#1a1a1a] text-[#f1f3f1] px-2 py-1 inline-block w-fit">
+                    {number.length === 2 ? "NÚMERO ERRADO" : "OPÇÃO SELECIONADA"}
+                 </h2>
+                 <h2 className="text-xl font-black text-red-700 mt-2 uppercase">VOTO NULO</h2>
+                 <h2 className="text-[10px] font-bold uppercase mt-1 text-slate-500">Confirma para anular seu voto</h2>
               </div>
             )}
           </div>

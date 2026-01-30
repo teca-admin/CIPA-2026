@@ -25,7 +25,7 @@ const App: React.FC = () => {
   const [loginError, setLoginError] = useState(false);
 
   const [currentNumber, setCurrentNumber] = useState('');
-  const [isBranco, setIsBranco] = useState(false);
+  const [isNuloByButton, setIsNuloByButton] = useState(false);
   const [isVoted, setIsVoted] = useState(false);
   const [isElectionClosed, setIsElectionClosed] = useState(Date.now() >= ELECTION_DEADLINE);
 
@@ -51,48 +51,65 @@ const App: React.FC = () => {
     loadData();
     const interval = setInterval(() => {
       if (viewMode === ViewMode.ADMIN) loadData();
-      // Verifica encerramento a cada 10 segundos
       setIsElectionClosed(Date.now() >= ELECTION_DEADLINE);
     }, 10000);
     return () => clearInterval(interval);
   }, [viewMode]);
 
   const handleNumberClick = useCallback((num: string) => {
-    if (isElectionClosed || isVoted || isBranco || currentNumber.length >= 2) return;
+    if (isElectionClosed || isVoted || currentNumber.length >= 2) return;
     audioService.playBeep();
+    setIsNuloByButton(false);
     setCurrentNumber(prev => prev + num);
-  }, [isVoted, isBranco, currentNumber.length, isElectionClosed]);
+  }, [isVoted, currentNumber.length, isElectionClosed]);
 
   const handleCorrige = useCallback(() => {
     if (isVoted || isElectionClosed) return;
     audioService.playBeep();
     setCurrentNumber('');
-    setIsBranco(false);
+    setIsNuloByButton(false);
+  }, [isVoted, isElectionClosed]);
+
+  const handleNuloButton = useCallback(() => {
+    if (isVoted || isElectionClosed) return;
+    audioService.playBeep();
+    setCurrentNumber('');
+    setIsNuloByButton(true);
   }, [isVoted, isElectionClosed]);
 
   const handleConfirma = useCallback(async () => {
     if (isVoted || isElectionClosed) return;
+    
     const foundCandidate = candidates.find(c => c.number === currentNumber);
-    if (!foundCandidate) {
+    let voteToSave = '';
+
+    if (foundCandidate && !isNuloByButton) {
+      voteToSave = foundCandidate.number;
+    } else if (isNuloByButton || currentNumber.length === 2) {
+      // Voto Nulo confirmado (via botão ou via número inexistente)
+      voteToSave = 'NULO';
+    } else {
+      // Número incompleto ou não preenchido
       audioService.playBeep();
       return;
     }
+
     try {
       audioService.playConfirm();
       setIsVoted(true);
-      await db.saveVote(foundCandidate.number);
+      await db.saveVote(voteToSave);
       loadData();
       
       setTimeout(() => {
         setIsVoted(false);
         setCurrentNumber('');
-        setIsBranco(false);
+        setIsNuloByButton(false);
       }, 1000);
     } catch (err: any) {
       alert('Erro ao registrar voto: ' + (err.message || 'Falha na conexão'));
       setIsVoted(false);
     }
-  }, [isVoted, candidates, currentNumber, isElectionClosed]);
+  }, [isVoted, candidates, currentNumber, isElectionClosed, isNuloByButton]);
 
   // Listener para teclado físico
   useEffect(() => {
@@ -106,12 +123,14 @@ const App: React.FC = () => {
         handleConfirma();
       } else if (key === 'Backspace' || key === 'Delete' || key === 'Escape') {
         handleCorrige();
+      } else if (key.toLowerCase() === 'b' || key.toLowerCase() === 'n') {
+        handleNuloButton();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige, isElectionClosed]);
+  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige, handleNuloButton, isElectionClosed]);
 
   const addCandidate = async (c: Omit<Candidate, 'id'>) => {
     try {
@@ -170,7 +189,7 @@ const App: React.FC = () => {
   };
 
   const selectedCandidate = candidates.find(c => c.number === currentNumber) || null;
-  const isNulo = currentNumber.length === 2 && !selectedCandidate;
+  const isNuloDisplay = isNuloByButton || (currentNumber.length === 2 && !selectedCandidate);
 
   // Se o sistema estiver fechado e não estiver autenticado, mostra a tela de trava
   if (isElectionClosed && !isAdminAuthenticated && !showLogin) {
@@ -237,7 +256,7 @@ const App: React.FC = () => {
 
       <main className={`flex-1 flex ${viewMode === ViewMode.ADMIN ? 'block' : 'items-center justify-center p-4'}`}>
         {showLogin ? (
-          <div className="bg-white p-10 rounded border border-slate-200 shadow-2xl w-full max-w-sm border-t-8 border-slate-900 animate-in fade-in zoom-in duration-300">
+          <div className="bg-white p-10 rounded border border-slate-200 shadow-2xl w-full max-sm border-t-8 border-slate-900 animate-in fade-in zoom-in duration-300">
             <div className="text-center mb-8">
               <Lock className="w-12 h-12 mx-auto text-slate-400 mb-2" />
               <h2 className="text-xl font-bold text-slate-800 uppercase tracking-tighter">Portal do Mesário</h2>
@@ -259,13 +278,24 @@ const App: React.FC = () => {
           <div className="urna-plastic p-8 lg:p-12 rounded flex flex-col items-center max-w-6xl w-full border-b-[6px] border-r-[4px] border-gray-400">
             <div className="w-full flex flex-col lg:flex-row gap-12 items-center lg:items-start">
               <div className="flex-1 w-full h-[480px] lg:h-[500px]">
-                <VotingScreen number={currentNumber} candidate={selectedCandidate} isBranco={isBranco} isNulo={isNulo} isVoted={isVoted} />
+                <VotingScreen 
+                  number={currentNumber} 
+                  candidate={selectedCandidate} 
+                  isBranco={false} 
+                  isNulo={isNuloDisplay} 
+                  isVoted={isVoted} 
+                />
               </div>
               <div className="flex flex-col items-center lg:pt-8">
                 <div className="mb-8 text-center border-2 border-gray-400 p-[22px] bg-gray-200/50 rounded-sm">
                    <div className="text-gray-500 text-[13px] font-bold uppercase tracking-[0.2em]">CIPA 2026</div>
                 </div>
-                <Keypad onNumberClick={handleNumberClick} onBranco={() => {}} onCorrige={handleCorrige} onConfirma={handleConfirma} />
+                <Keypad 
+                  onNumberClick={handleNumberClick} 
+                  onBranco={handleNuloButton} 
+                  onCorrige={handleCorrige} 
+                  onConfirma={handleConfirma} 
+                />
                 <div className="mt-8 flex gap-4 opacity-30 grayscale">
                     <ShieldCheck className="w-8 h-8" />
                 </div>

@@ -35,10 +35,10 @@ const Keypad: React.FC<KeypadProps> = ({ onNumberClick, onBranco, onCorrige, onC
 
       <div className="grid grid-cols-3 gap-3 mt-4 h-16">
         <button
-          disabled
-          className="bg-white text-black text-[10px] font-bold uppercase p-2 rounded-sm shadow-md opacity-40 cursor-not-allowed flex items-end justify-center pb-2"
+          onClick={onBranco}
+          className="bg-[#ef4444] text-white text-[10px] font-bold uppercase p-2 rounded-sm shadow-md border-b-4 border-[#b91c1c] active:border-b-0 active:translate-y-1 transition-all flex items-end justify-center pb-2"
         >
-          Branco
+          Nulo
         </button>
         <button
           onClick={onCorrige}

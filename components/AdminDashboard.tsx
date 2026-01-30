@@ -1,8 +1,12 @@
 
 import React, { useState, useRef } from 'react';
 import { Candidate, Vote } from '../types.ts';
-import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock } from 'lucide-react';
+// Added Ban to the lucide-react imports
+import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock, FileSpreadsheet, Download, Ban } from 'lucide-react';
 import { sanitizeImageUrl } from '../utils/urlHelper.ts';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 
 interface AdminDashboardProps {
   candidates: Candidate[];
@@ -28,11 +32,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Função para formatar o horário de Manaus sem mexer no banco
   const formatManausTime = (timestamp: any) => {
     if (!timestamp) return '--:--';
     try {
-      // Converte para o fuso de Manaus (America/Manaus)
       return new Intl.DateTimeFormat('pt-BR', {
         timeZone: 'America/Manaus',
         hour: '2-digit',
@@ -48,6 +50,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   };
 
   const totalVotesCount = votes.length;
+  const nullVotesCount = votes.filter(v => v.candidateNumber === 'NULO').length;
 
   const stats = candidates.map(c => {
     const candidateVotes = votes.filter(v => v.candidateNumber === c.number).length;
@@ -60,6 +63,46 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
       color: '#6366f1'
     };
   }).sort((a, b) => b.votes - a.votes);
+
+  const exportToExcel = () => {
+    const data = [
+      ...stats.map(s => ({ "Candidato": s.name, "Número": s.number, "Votos": s.votes, "Porcentagem": `${s.percentage}%` })),
+      { "Candidato": "VOTOS NULOS", "Número": "--", "Votos": nullVotesCount, "Porcentagem": totalVotesCount > 0 ? `${((nullVotesCount / totalVotesCount) * 100).toFixed(1)}%` : "0%" },
+      { "Candidato": "TOTAL GERAL", "Número": "--", "Votos": totalVotesCount, "Porcentagem": "100%" }
+    ];
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Resultados CIPA");
+    XLSX.writeFile(wb, `resultado_cipa_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportToPDF = () => {
+    const doc = new jsPDF();
+    const manausTime = formatManausTime(new Date());
+
+    doc.setFontSize(18);
+    doc.text("Relatório de Apuração - Eleição CIPA 2026", 14, 20);
+    
+    doc.setFontSize(10);
+    doc.text(`Data de Emissão: ${manausTime}`, 14, 28);
+    doc.text(`Total de Votos Computados: ${totalVotesCount}`, 14, 34);
+
+    const tableData = [
+      ...stats.map(s => [s.name, s.number, s.votes, `${s.percentage}%`]),
+      ["VOTOS NULOS", "--", nullVotesCount, totalVotesCount > 0 ? `${((nullVotesCount / totalVotesCount) * 100).toFixed(1)}%` : "0%"]
+    ];
+
+    (doc as any).autoTable({
+      startY: 40,
+      head: [['Candidato', 'Nº', 'Votos', '%']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [15, 23, 42] }
+    });
+
+    doc.save(`resultado_cipa_${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,14 +124,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (newName && newNumber && newPhotoBase64) {
-      onAddCandidate({ 
-        name: newName, 
-        number: newNumber, 
-        photoUrl: newPhotoBase64 
-      });
-      setNewName('');
-      setNewNumber('');
-      setNewPhotoBase64('');
+      onAddCandidate({ name: newName, number: newNumber, photoUrl: newPhotoBase64 });
+      setNewName(''); setNewNumber(''); setNewPhotoBase64('');
       if (fileInputRef.current) fileInputRef.current.value = '';
       setActiveTab('candidates'); 
     }
@@ -96,7 +133,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
 
   return (
     <div className="flex flex-col h-screen bg-[#f8fafc] overflow-hidden">
-      {/* Top Header */}
       <div className="bg-white border-b border-slate-200 px-8 py-4 flex justify-between items-center shrink-0">
         <div className="flex items-center gap-4">
           <div className="bg-slate-900 p-2 rounded-md text-white">
@@ -108,28 +144,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={exportToExcel}
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Excel
+          </button>
+          <button 
+            onClick={exportToPDF}
+            className="flex items-center gap-2 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-colors"
+          >
+            <Download className="w-4 h-4" /> Relatório PDF
+          </button>
+          <div className="h-8 w-px bg-slate-200 mx-2"></div>
           <button 
             onClick={() => { if(confirm('⚠️ ALERTA CRÍTICO: Você está prestes a APAGAR TODOS OS VOTOS desta eleição. Esta ação não pode ser desfeita. Confirmar?')) onResetVotes(); }} 
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md text-xs font-bold hover:bg-red-50 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-red-50 transition-colors shadow-sm"
           >
             <AlertTriangle className="w-4 h-4" /> Zerar Urna
           </button>
-
-          <div className="flex gap-6 pl-2">
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Votos Totais</p>
-              <p className="text-xl font-mono font-bold text-slate-900 leading-none">{votes.length}</p>
-            </div>
-            <div className="text-right">
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Candidatos</p>
-              <p className="text-xl font-mono font-bold text-slate-900 leading-none">{candidates.length}</p>
-            </div>
-          </div>
         </div>
       </div>
 
-      {/* Tab Navigation */}
       <div className="bg-white border-b border-slate-200 px-8 shrink-0 flex gap-8">
         {[
           { id: 'results', label: 'Apuração', icon: BarChart3 },
@@ -152,13 +189,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         ))}
       </div>
 
-      {/* Content Area */}
       <div className="flex-1 overflow-auto p-8">
         <div className="max-w-[1200px] mx-auto">
           
-          {/* TAB: RESULTS */}
           {activeTab === 'results' && (
             <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                 <div className="bg-indigo-600 p-6 rounded-xl text-white shadow-lg">
+                    <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Votos Válidos</p>
+                    <h3 className="text-4xl font-black font-mono">{votes.length - nullVotesCount}</h3>
+                 </div>
+                 <div className="bg-slate-800 p-6 rounded-xl text-white shadow-lg">
+                    <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Votos Nulos</p>
+                    <h3 className="text-4xl font-black font-mono">{nullVotesCount}</h3>
+                 </div>
+                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Total Geral</p>
+                    <h3 className="text-4xl font-black font-mono text-slate-900">{votes.length}</h3>
+                 </div>
+              </div>
+
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
                   <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
@@ -202,6 +252,33 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           </div>
                         </div>
                       ))}
+                      
+                      {/* Linha de Votos Nulos na Lista */}
+                      <div className="flex items-center gap-6 p-2 rounded-lg mt-6 border-t border-slate-100 pt-6">
+                        <div className="flex items-center gap-4 w-[280px] shrink-0">
+                          <div className="w-12 h-14 bg-slate-200 rounded flex items-center justify-center text-slate-400">
+                            <Ban className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-slate-400 uppercase leading-tight">Votos Nulos</p>
+                            <p className="text-[10px] font-bold text-slate-400">Número Inválido</p>
+                          </div>
+                        </div>
+                        <div className="flex-1 flex flex-col gap-1.5">
+                           <div className="flex justify-between items-end">
+                              <span className="text-[10px] font-black text-slate-500 uppercase">{nullVotesCount} votos</span>
+                              <span className="text-xs font-mono font-black text-slate-400">
+                                {totalVotesCount > 0 ? ((nullVotesCount / totalVotesCount) * 100).toFixed(1) : "0"}%
+                              </span>
+                           </div>
+                           <div className="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-slate-400"
+                                style={{ width: totalVotesCount > 0 ? `${(nullVotesCount / totalVotesCount) * 100}%` : '0%' }}
+                              ></div>
+                           </div>
+                        </div>
+                      </div>
                     </div>
                   ) : (
                     <div className="h-40 flex flex-col items-center justify-center text-slate-400">
@@ -213,7 +290,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {/* TAB: AUDIT LOGS (MANAUS TIME) */}
           {activeTab === 'logs' && (
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
@@ -242,10 +318,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                              </div>
                           </td>
                           <td className="px-6 py-3">
-                            <span className="bg-slate-800 text-white px-2 py-0.5 rounded text-xs font-bold">{v.candidateNumber}</span>
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${v.candidateNumber === 'NULO' ? 'bg-red-100 text-red-700' : 'bg-slate-800 text-white'}`}>
+                              {v.candidateNumber}
+                            </span>
                           </td>
                           <td className="px-6 py-3 text-xs font-bold text-slate-600 uppercase">
-                            {cand?.name || 'Candidato Desconhecido'}
+                            {v.candidateNumber === 'NULO' ? 'VOTO NULO' : (cand?.name || 'Candidato Desconhecido')}
                           </td>
                           <td className="px-6 py-3 font-mono text-[9px] text-slate-400">
                             {v.id}
@@ -259,7 +337,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {/* TAB: CANDIDATES */}
           {activeTab === 'candidates' && ( 
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
@@ -294,7 +371,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {/* TAB: REGISTER */}
           {activeTab === 'register' && (
             <div className="max-w-md mx-auto bg-white border border-slate-200 rounded-lg p-8 shadow-sm">
               <h2 className="text-lg font-bold text-slate-800 mb-6">Novo Cadastro</h2>
