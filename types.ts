@@ -9,8 +9,9 @@ export interface Candidate {
 
 export interface Vote {
   id: string;
-  candidateNumber: string; // "BRANCO", "NULO" or the candidate number
+  candidateNumber: string; 
   timestamp: number;
+  timestampManaus?: string; // Horário formatado de Manaus
 }
 
 export enum ViewMode {

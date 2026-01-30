@@ -1,5 +1,5 @@
 
--- Script de configuração para a Urna Eletrônica CIPA 2026
+-- Script de configuração atualizado para a Urna Eletrônica CIPA 2026
 
 -- 1. Tabela de Candidatos
 CREATE TABLE IF NOT EXISTS public.candidates (
@@ -11,13 +11,15 @@ CREATE TABLE IF NOT EXISTS public.candidates (
 );
 
 -- 2. Tabela de Votos
+-- Adicionada coluna timestamp_manaus que converte automaticamente o UTC para o horário local de Manaus
 CREATE TABLE IF NOT EXISTS public.votes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     candidate_number TEXT NOT NULL,
-    timestamp TIMESTAMPTZ DEFAULT NOW()
+    timestamp TIMESTAMPTZ DEFAULT NOW(),
+    -- Coluna gerada para facilitar a conferência direta no banco de dados (Manaus AM)
+    timestamp_manaus TIMESTAMP GENERATED ALWAYS AS (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/Manaus') STORED
 );
 
--- 3. Políticas de Segurança (Simplificado para Urna Local/Interna)
--- Desabilita RLS para permitir que a aplicação web gerencie os dados diretamente
+-- 3. Políticas de Segurança
 ALTER TABLE public.candidates DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.votes DISABLE ROW LEVEL SECURITY;

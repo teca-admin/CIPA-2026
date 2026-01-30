@@ -24,7 +24,7 @@ export const getCandidates = async (): Promise<Candidate[]> => {
     }));
   } catch (error: any) {
     console.error('Erro ao buscar candidatos:', error);
-    throw new Error(`Erro de Banco: ${error.message || 'Verifique se a tabela "candidates" existe no novo Supabase.'}`);
+    throw new Error(`Erro de Banco: ${error.message}`);
   }
 };
 
@@ -60,14 +60,15 @@ export const getVotes = async (): Promise<Vote[]> => {
   try {
     const { data, error } = await supabase
       .from('votes')
-      .select('*');
+      .select('id, candidate_number, timestamp, timestamp_manaus');
     
     if (error) throw error;
     
     return (data || []).map(item => ({
       id: item.id,
       candidateNumber: item.candidate_number,
-      timestamp: item.timestamp ? new Date(item.timestamp).getTime() : Date.now()
+      timestamp: item.timestamp ? new Date(item.timestamp).getTime() : Date.now(),
+      timestampManaus: item.timestamp_manaus
     }));
   } catch (error: any) {
     console.error('Erro ao buscar votos:', error);
