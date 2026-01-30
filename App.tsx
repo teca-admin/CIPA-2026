@@ -6,16 +6,9 @@ import Keypad from './components/Keypad.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import { audioService } from './services/audioService.ts';
 import * as db from './services/supabase.ts';
-import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon, Ban, Clock } from 'lucide-react';
+import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'wfsteca1';
-
-/** 
- * CONFIGURAÇÃO DE ENCERRAMENTO (MANAUS UTC-4)
- * TESTE: '2026-01-30T16:00:00-04:00' (Hoje às 16h)
- * OFICIAL: '2026-01-31T00:00:00-04:00' (Hoje às 00h / Início de amanhã)
- */
-const ELECTION_DEADLINE = new Date('2026-01-30T16:00:00-04:00').getTime();
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.VOTING);
@@ -32,7 +25,6 @@ const App: React.FC = () => {
   const [currentNumber, setCurrentNumber] = useState('');
   const [isBranco, setIsBranco] = useState(false);
   const [isVoted, setIsVoted] = useState(false);
-  const [isElectionClosed, setIsElectionClosed] = useState(Date.now() >= ELECTION_DEADLINE);
 
   const loadData = async () => {
     try {
@@ -54,42 +46,27 @@ const App: React.FC = () => {
 
   useEffect(() => {
     loadData();
-    
-    // Intervalo de verificação em tempo real
     const interval = setInterval(() => {
-      // 1. Atualiza dados se estiver no admin
       if (viewMode === ViewMode.ADMIN) loadData();
-      
-      // 2. VERIFICAÇÃO AUTOMÁTICA DA TRAVA (SEM REFRESH)
-      const now = Date.now();
-      if (now >= ELECTION_DEADLINE && !isElectionClosed) {
-        setIsElectionClosed(true);
-        // Se estiver votando, limpa os campos para segurança
-        if (viewMode === ViewMode.VOTING) {
-           setCurrentNumber('');
-           setIsBranco(false);
-        }
-      }
-    }, 1000); // Checa a cada 1 segundo para ser exato
-
+    }, 10000);
     return () => clearInterval(interval);
-  }, [viewMode, isElectionClosed]);
+  }, [viewMode]);
 
   const handleNumberClick = useCallback((num: string) => {
-    if (isElectionClosed || isVoted || isBranco || currentNumber.length >= 2) return;
+    if (isVoted || isBranco || currentNumber.length >= 2) return;
     audioService.playBeep();
     setCurrentNumber(prev => prev + num);
-  }, [isVoted, isBranco, currentNumber.length, isElectionClosed]);
+  }, [isVoted, isBranco, currentNumber.length]);
 
   const handleCorrige = useCallback(() => {
-    if (isVoted || isElectionClosed) return;
+    if (isVoted) return;
     audioService.playBeep();
     setCurrentNumber('');
     setIsBranco(false);
-  }, [isVoted, isElectionClosed]);
+  }, [isVoted]);
 
   const handleConfirma = useCallback(async () => {
-    if (isVoted || isElectionClosed) return;
+    if (isVoted) return;
     const foundCandidate = candidates.find(c => c.number === currentNumber);
     if (!foundCandidate) {
       audioService.playBeep();
@@ -110,14 +87,16 @@ const App: React.FC = () => {
       alert('Erro ao registrar voto: ' + (err.message || 'Falha na conexão'));
       setIsVoted(false);
     }
-  }, [isVoted, candidates, currentNumber, isElectionClosed]);
+  }, [isVoted, candidates, currentNumber]);
 
   // Listener para teclado físico
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (viewMode !== ViewMode.VOTING || showLogin || isLoading || !!errorMessage || isVoted || isElectionClosed) return;
+      // Só processa se estiver na Urna e não estiver logando/erro
+      if (viewMode !== ViewMode.VOTING || showLogin || isLoading || !!errorMessage || isVoted) return;
 
       const key = e.key;
+
       if (/^[0-9]$/.test(key)) {
         handleNumberClick(key);
       } else if (key === 'Enter') {
@@ -129,7 +108,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige, isElectionClosed]);
+  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige]);
 
   const addCandidate = async (c: Omit<Candidate, 'id'>) => {
     try {
@@ -190,42 +169,6 @@ const App: React.FC = () => {
   const selectedCandidate = candidates.find(c => c.number === currentNumber) || null;
   const isNulo = currentNumber.length === 2 && !selectedCandidate;
 
-  // TELA DE TRAVA (ELEIÇÃO ENCERRADA)
-  if (isElectionClosed && !isAdminAuthenticated && !showLogin) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
-        <div className="bg-white p-12 rounded-xl shadow-2xl max-w-lg w-full text-center border-t-8 border-red-600 animate-in fade-in zoom-in duration-500">
-          <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Ban className="w-10 h-10 text-red-600" />
-          </div>
-          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Eleição Finalizada</h1>
-          <p className="text-slate-500 text-sm mb-8 leading-relaxed">
-            O período oficial de votação da CIPA 2026 chegou ao fim.<br/>
-            <strong>Nenhum novo voto poderá ser computado.</strong>
-          </p>
-          
-          <div className="bg-slate-50 p-6 rounded-lg border border-slate-100 mb-8">
-            <div className="flex items-center gap-3 text-slate-400 mb-4 justify-center">
-               <Lock className="w-4 h-4" />
-               <span className="text-[10px] font-bold uppercase tracking-widest">Painel de Auditoria Restrito</span>
-            </div>
-            <button 
-              onClick={() => setShowLogin(true)}
-              className="w-full bg-slate-900 text-white font-bold py-4 rounded-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-lg"
-            >
-              <LogIn className="w-5 h-5" /> ACESSAR APURAÇÃO
-            </button>
-          </div>
-
-          <div className="flex items-center justify-center gap-2 text-slate-300">
-            <Clock className="w-3 h-3" />
-            <span className="text-[9px] font-bold uppercase tracking-tighter">Fuso Horário: Manaus (UTC-4)</span>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (errorMessage) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6 font-sans">
@@ -245,13 +188,12 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans ${viewMode === ViewMode.ADMIN ? 'bg-[#f8fafc]' : 'bg-[#d1d5db]'}`}>
-      {/* Botão invisível/discreto para admin */}
       <button 
         onClick={handleAdminToggle}
-        className="fixed top-4 right-4 z-50 p-3 bg-slate-400/10 hover:bg-slate-400/30 rounded-full transition-all text-slate-600/50"
+        className="fixed top-4 right-4 z-50 p-3 bg-slate-400/20 hover:bg-slate-400/40 rounded-full transition-all text-slate-600"
         title="Portal Admin"
       >
-        {viewMode === ViewMode.VOTING ? <SettingsIcon className="w-4 h-4" /> : <LogOut className="w-5 h-5 text-red-600" />}
+        {viewMode === ViewMode.VOTING ? <SettingsIcon className="w-5 h-5" /> : <LogOut className="w-5 h-5 text-red-600" />}
       </button>
 
       <main className={`flex-1 flex ${viewMode === ViewMode.ADMIN ? 'block' : 'items-center justify-center p-4'}`}>
