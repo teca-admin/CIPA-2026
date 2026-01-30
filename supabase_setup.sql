@@ -11,13 +11,13 @@ CREATE TABLE IF NOT EXISTS public.candidates (
 );
 
 -- 2. Tabela de Votos
--- Adicionada coluna timestamp_manaus que converte automaticamente o UTC para o horário local de Manaus
+-- CORREÇÃO: timestamp AT TIME ZONE 'America/Manaus' converte o UTC para o horário local (subtraindo 4h)
 CREATE TABLE IF NOT EXISTS public.votes (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     candidate_number TEXT NOT NULL,
     timestamp TIMESTAMPTZ DEFAULT NOW(),
-    -- Coluna gerada para facilitar a conferência direta no banco de dados (Manaus AM)
-    timestamp_manaus TIMESTAMP GENERATED ALWAYS AS (timestamp AT TIME ZONE 'UTC' AT TIME ZONE 'America/Manaus') STORED
+    -- Coluna gerada que agora subtrai corretamente as horas para o fuso de Manaus
+    timestamp_manaus TIMESTAMP GENERATED ALWAYS AS (timestamp AT TIME ZONE 'America/Manaus') STORED
 );
 
 -- 3. Políticas de Segurança
