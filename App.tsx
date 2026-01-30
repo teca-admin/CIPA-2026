@@ -6,9 +6,11 @@ import Keypad from './components/Keypad.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import { audioService } from './services/audioService.ts';
 import * as db from './services/supabase.ts';
-import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon, Ban, Clock } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'wfsteca1';
+// Deadline: 31/01/2026 às 00:00:00 (O sistema trava assim que o dia 30 terminar)
+const ELECTION_DEADLINE = new Date('2026-01-31T00:00:00').getTime();
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.VOTING);
@@ -25,6 +27,7 @@ const App: React.FC = () => {
   const [currentNumber, setCurrentNumber] = useState('');
   const [isBranco, setIsBranco] = useState(false);
   const [isVoted, setIsVoted] = useState(false);
+  const [isElectionClosed, setIsElectionClosed] = useState(Date.now() >= ELECTION_DEADLINE);
 
   const loadData = async () => {
     try {
@@ -48,25 +51,27 @@ const App: React.FC = () => {
     loadData();
     const interval = setInterval(() => {
       if (viewMode === ViewMode.ADMIN) loadData();
+      // Verifica encerramento a cada 10 segundos
+      setIsElectionClosed(Date.now() >= ELECTION_DEADLINE);
     }, 10000);
     return () => clearInterval(interval);
   }, [viewMode]);
 
   const handleNumberClick = useCallback((num: string) => {
-    if (isVoted || isBranco || currentNumber.length >= 2) return;
+    if (isElectionClosed || isVoted || isBranco || currentNumber.length >= 2) return;
     audioService.playBeep();
     setCurrentNumber(prev => prev + num);
-  }, [isVoted, isBranco, currentNumber.length]);
+  }, [isVoted, isBranco, currentNumber.length, isElectionClosed]);
 
   const handleCorrige = useCallback(() => {
-    if (isVoted) return;
+    if (isVoted || isElectionClosed) return;
     audioService.playBeep();
     setCurrentNumber('');
     setIsBranco(false);
-  }, [isVoted]);
+  }, [isVoted, isElectionClosed]);
 
   const handleConfirma = useCallback(async () => {
-    if (isVoted) return;
+    if (isVoted || isElectionClosed) return;
     const foundCandidate = candidates.find(c => c.number === currentNumber);
     if (!foundCandidate) {
       audioService.playBeep();
@@ -87,16 +92,14 @@ const App: React.FC = () => {
       alert('Erro ao registrar voto: ' + (err.message || 'Falha na conexão'));
       setIsVoted(false);
     }
-  }, [isVoted, candidates, currentNumber]);
+  }, [isVoted, candidates, currentNumber, isElectionClosed]);
 
   // Listener para teclado físico
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Só processa se estiver na Urna e não estiver logando/erro
-      if (viewMode !== ViewMode.VOTING || showLogin || isLoading || !!errorMessage || isVoted) return;
+      if (viewMode !== ViewMode.VOTING || showLogin || isLoading || !!errorMessage || isVoted || isElectionClosed) return;
 
       const key = e.key;
-
       if (/^[0-9]$/.test(key)) {
         handleNumberClick(key);
       } else if (key === 'Enter') {
@@ -108,7 +111,7 @@ const App: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige]);
+  }, [viewMode, showLogin, isLoading, errorMessage, isVoted, handleNumberClick, handleConfirma, handleCorrige, isElectionClosed]);
 
   const addCandidate = async (c: Omit<Candidate, 'id'>) => {
     try {
@@ -168,6 +171,42 @@ const App: React.FC = () => {
 
   const selectedCandidate = candidates.find(c => c.number === currentNumber) || null;
   const isNulo = currentNumber.length === 2 && !selectedCandidate;
+
+  // Se o sistema estiver fechado e não estiver autenticado, mostra a tela de trava
+  if (isElectionClosed && !isAdminAuthenticated && !showLogin) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-6 font-sans">
+        <div className="bg-white p-12 rounded-xl shadow-2xl max-w-lg w-full text-center border-t-8 border-indigo-600 animate-in fade-in zoom-in duration-500">
+          <div className="bg-red-50 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6">
+            <Ban className="w-10 h-10 text-red-600" />
+          </div>
+          <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tight mb-2">Eleição Encerrada</h1>
+          <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+            O período de votação da CIPA 2026 foi finalizado conforme o cronograma oficial.<br/>
+            <strong>Data Limite: 30/01/2026 - 23:59</strong>
+          </p>
+          
+          <div className="bg-slate-50 p-6 rounded-lg border border-slate-100 mb-8">
+            <div className="flex items-center gap-3 text-slate-400 mb-4 justify-center">
+               <Lock className="w-4 h-4" />
+               <span className="text-[10px] font-bold uppercase tracking-widest">Acesso Restrito à Apuração</span>
+            </div>
+            <button 
+              onClick={() => setShowLogin(true)}
+              className="w-full bg-slate-900 text-white font-bold py-4 rounded-lg hover:bg-slate-800 transition-all flex items-center justify-center gap-3 shadow-lg"
+            >
+              <LogIn className="w-5 h-5" /> ENTRAR COMO MESÁRIO
+            </button>
+          </div>
+
+          <div className="flex items-center justify-center gap-2 text-slate-300">
+            <Clock className="w-3 h-3" />
+            <span className="text-[9px] font-bold uppercase tracking-tighter">Horário de Manaus (UTC-4)</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (errorMessage) {
     return (
