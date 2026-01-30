@@ -1,12 +1,9 @@
 
 import React, { useState, useRef } from 'react';
 import { Candidate, Vote } from '../types.ts';
-// Added Ban to the lucide-react imports
 import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock, FileSpreadsheet, Download, Ban } from 'lucide-react';
 import { sanitizeImageUrl } from '../utils/urlHelper.ts';
 import * as XLSX from 'xlsx';
-import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
 
 interface AdminDashboardProps {
   candidates: Candidate[];
@@ -32,8 +29,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const formatManausTime = (timestamp: any) => {
-    if (!timestamp) return '--:--';
+  // Função para formatar a exibição do horário na tela
+  const displayTime = (v: Vote) => {
+    // Prioriza o valor calculado pelo banco de dados (automático)
+    if (v.timestampManaus) {
+      // O formato vindo do PG costuma ser "YYYY-MM-DD HH:mm:ss"
+      const datePart = v.timestampManaus.split('T')[0] || v.timestampManaus;
+      const timePart = v.timestampManaus.split('T')[1] || '';
+      return `${datePart.split('-').reverse().join('/')} ${timePart.split('.')[0]}`;
+    }
+    
+    // Fallback caso a coluna ainda não tenha sido populada por algum motivo
     try {
       return new Intl.DateTimeFormat('pt-BR', {
         timeZone: 'America/Manaus',
@@ -43,9 +49,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         day: '2-digit',
         month: '2-digit',
         year: 'numeric'
-      }).format(new Date(timestamp));
+      }).format(new Date(v.timestamp));
     } catch (e) {
-      return 'Erro fuso';
+      return '--:--';
     }
   };
 
@@ -65,43 +71,32 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   }).sort((a, b) => b.votes - a.votes);
 
   const exportToExcel = () => {
-    const data = [
-      ...stats.map(s => ({ "Candidato": s.name, "Número": s.number, "Votos": s.votes, "Porcentagem": `${s.percentage}%` })),
-      { "Candidato": "VOTOS NULOS", "Número": "--", "Votos": nullVotesCount, "Porcentagem": totalVotesCount > 0 ? `${((nullVotesCount / totalVotesCount) * 100).toFixed(1)}%` : "0%" },
-      { "Candidato": "TOTAL GERAL", "Número": "--", "Votos": totalVotesCount, "Porcentagem": "100%" }
-    ];
+    // Agora exporta os LOGS (Auditória) em vez dos resultados resumidos
+    const auditData = [...votes]
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .map(v => {
+        const cand = candidates.find(c => c.number === v.candidateNumber);
+        return {
+          "Data/Hora (Manaus)": displayTime(v),
+          "Nº Candidato": v.candidateNumber,
+          "Nome do Candidato": v.candidateNumber === 'NULO' ? 'VOTO NULO' : (cand?.name || 'Não Encontrado'),
+          "ID Único do Voto": v.id
+        };
+      });
 
-    const ws = XLSX.utils.json_to_sheet(data);
+    const ws = XLSX.utils.json_to_sheet(auditData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Resultados CIPA");
-    XLSX.writeFile(wb, `resultado_cipa_${new Date().toISOString().split('T')[0]}.xlsx`);
-  };
-
-  const exportToPDF = () => {
-    const doc = new jsPDF();
-    const manausTime = formatManausTime(new Date());
-
-    doc.setFontSize(18);
-    doc.text("Relatório de Apuração - Eleição CIPA 2026", 14, 20);
+    XLSX.utils.book_append_sheet(wb, ws, "Auditória de Votos CIPA");
     
-    doc.setFontSize(10);
-    doc.text(`Data de Emissão: ${manausTime}`, 14, 28);
-    doc.text(`Total de Votos Computados: ${totalVotesCount}`, 14, 34);
-
-    const tableData = [
-      ...stats.map(s => [s.name, s.number, s.votes, `${s.percentage}%`]),
-      ["VOTOS NULOS", "--", nullVotesCount, totalVotesCount > 0 ? `${((nullVotesCount / totalVotesCount) * 100).toFixed(1)}%` : "0%"]
+    // Ajuste de largura das colunas para melhor visualização
+    ws['!cols'] = [
+      { wch: 25 }, // Data/Hora
+      { wch: 15 }, // Nº
+      { wch: 40 }, // Nome
+      { wch: 40 }  // ID
     ];
 
-    (doc as any).autoTable({
-      startY: 40,
-      head: [['Candidato', 'Nº', 'Votos', '%']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [15, 23, 42] }
-    });
-
-    doc.save(`resultado_cipa_${new Date().toISOString().split('T')[0]}.pdf`);
+    XLSX.writeFile(wb, `auditoria_cipa_manaus_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -147,15 +142,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         <div className="flex items-center gap-4">
           <button 
             onClick={exportToExcel}
-            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors shadow-sm"
+            title="Exportar Auditória para Excel"
           >
-            <FileSpreadsheet className="w-4 h-4" /> Excel
-          </button>
-          <button 
-            onClick={exportToPDF}
-            className="flex items-center gap-2 px-3 py-2 bg-rose-50 text-rose-700 border border-rose-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-rose-100 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Relatório PDF
+            <FileSpreadsheet className="w-4 h-4" /> Excel (Auditória)
           </button>
           <div className="h-8 w-px bg-slate-200 mx-2"></div>
           <button 
@@ -253,7 +243,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                         </div>
                       ))}
                       
-                      {/* Linha de Votos Nulos na Lista */}
                       <div className="flex items-center gap-6 p-2 rounded-lg mt-6 border-t border-slate-100 pt-6">
                         <div className="flex items-center gap-4 w-[280px] shrink-0">
                           <div className="w-12 h-14 bg-slate-200 rounded flex items-center justify-center text-slate-400">
@@ -293,14 +282,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
           {activeTab === 'logs' && (
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
-                <h2 className="text-sm font-bold text-slate-700">Auditória de Votos (Horário Manaus)</h2>
-                <div className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-black">UTC-4</div>
+                <h2 className="text-sm font-bold text-slate-700">Auditória de Votos (Automação Manaus)</h2>
+                <div className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-1 rounded font-black">DATABASE GENERATED</div>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase">
-                      <th className="px-6 py-4">Data/Hora (Manaus)</th>
+                      <th className="px-6 py-4">Data/Hora (Banco de Dados)</th>
                       <th className="px-6 py-4">Nº Candidato</th>
                       <th className="px-6 py-4">Nome</th>
                       <th className="px-6 py-4">ID Único do Voto</th>
@@ -314,7 +303,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
                           <td className="px-6 py-3 font-mono text-xs font-bold text-indigo-600">
                              <div className="flex items-center gap-2">
                                <Clock className="w-3 h-3" />
-                               {formatManausTime(v.timestamp)}
+                               {displayTime(v)}
                              </div>
                           </td>
                           <td className="px-6 py-3">
