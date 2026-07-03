@@ -1,7 +1,7 @@
 
 import React, { useState, useRef } from 'react';
 import { Candidate, Vote } from '../types.ts';
-import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock, FileSpreadsheet, Download, Ban } from 'lucide-react';
+import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock, FileSpreadsheet, Download, Ban, LogOut } from 'lucide-react';
 import { sanitizeImageUrl } from '../utils/urlHelper.ts';
 import * as XLSX from 'xlsx';
 
@@ -11,22 +11,25 @@ interface AdminDashboardProps {
   onAddCandidate: (c: Omit<Candidate, 'id'>) => void;
   onDeleteCandidate: (id: string) => void;
   onResetVotes: () => void;
+  onLogout: () => void;
 }
 
 const FALLBACK_PHOTO = 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
 
-const AdminDashboard: React.FC<AdminDashboardProps> = ({ 
-  candidates, 
-  votes, 
-  onAddCandidate, 
-  onDeleteCandidate, 
-  onResetVotes 
+const AdminDashboard: React.FC<AdminDashboardProps> = ({
+  candidates,
+  votes,
+  onAddCandidate,
+  onDeleteCandidate,
+  onResetVotes,
+  onLogout
 }) => {
   const [activeTab, setActiveTab] = useState<'results' | 'candidates' | 'register' | 'logs'>('results');
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
   const [newPhotoBase64, setNewPhotoBase64] = useState('');
   const [isUploading, setIsUploading] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Função para formatar a exibição do horário na tela
@@ -148,14 +151,49 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <FileSpreadsheet className="w-4 h-4" /> Excel (Auditória)
           </button>
           <div className="h-8 w-px bg-slate-200 mx-2"></div>
-          <button 
-            onClick={() => { if(confirm('⚠️ ALERTA CRÍTICO: Você está prestes a APAGAR TODOS OS VOTOS desta eleição. Esta ação não pode ser desfeita. Confirmar?')) onResetVotes(); }} 
+          <button
+            onClick={() => setShowResetConfirm(true)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-red-50 transition-colors shadow-sm"
           >
             <AlertTriangle className="w-4 h-4" /> Zerar Urna
           </button>
+          <div className="h-8 w-px bg-slate-200 mx-2"></div>
+          <button
+            onClick={onLogout}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-50 border border-slate-200 text-slate-600 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-slate-100 transition-colors shadow-sm"
+          >
+            <LogOut className="w-4 h-4" /> Sair
+          </button>
         </div>
       </div>
+
+      {showResetConfirm && (
+        <div className="fixed inset-0 bg-slate-900/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-sm w-full border-t-8 border-red-500 p-8 text-center animate-in fade-in zoom-in duration-200">
+            <div className="bg-red-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-5">
+              <AlertTriangle className="w-8 h-8 text-red-600" />
+            </div>
+            <h2 className="text-lg font-black text-slate-900 uppercase tracking-tight mb-2">Alerta Crítico</h2>
+            <p className="text-slate-500 text-sm mb-8 leading-relaxed">
+              Você está prestes a apagar todos os votos desta eleição. Esta ação não pode ser desfeita.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="flex-1 bg-slate-100 text-slate-600 font-bold py-3 rounded-lg hover:bg-slate-200 transition-colors text-sm uppercase"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { onResetVotes(); setShowResetConfirm(false); }}
+                className="flex-1 bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition-colors text-sm uppercase"
+              >
+                Confirmar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white border-b border-slate-200 px-8 shrink-0 flex gap-8">
         {[

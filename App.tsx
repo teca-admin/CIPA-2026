@@ -6,7 +6,7 @@ import Keypad from './components/Keypad.tsx';
 import AdminDashboard from './components/AdminDashboard.tsx';
 import { audioService } from './services/audioService.ts';
 import * as db from './services/supabase.ts';
-import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon, Ban, Clock } from 'lucide-react';
+import { ShieldCheck, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon, Ban, Clock } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'wfsteca1';
 // Deadline da eleição anterior já passou. Ajuste esta data antes de abrir a votação da nova eleição.
@@ -246,13 +246,15 @@ const App: React.FC = () => {
 
   return (
     <div className={`min-h-screen flex flex-col font-sans ${viewMode === ViewMode.ADMIN ? 'bg-[#f8fafc]' : 'bg-[#d1d5db]'}`}>
-      <button 
-        onClick={handleAdminToggle}
-        className="fixed top-4 right-4 z-50 p-3 bg-slate-400/20 hover:bg-slate-400/40 rounded-full transition-all text-slate-600"
-        title="Portal Admin"
-      >
-        {viewMode === ViewMode.VOTING ? <SettingsIcon className="w-5 h-5" /> : <LogOut className="w-5 h-5 text-red-600" />}
-      </button>
+      {viewMode === ViewMode.VOTING && (
+        <button
+          onClick={handleAdminToggle}
+          className="fixed top-4 right-4 z-50 p-3 bg-slate-400/20 hover:bg-slate-400/40 rounded-full transition-all text-slate-600"
+          title="Portal Admin"
+        >
+          <SettingsIcon className="w-5 h-5" />
+        </button>
+      )}
 
       <main className={`flex-1 flex ${viewMode === ViewMode.ADMIN ? 'block' : 'items-center justify-center p-4'}`}>
         {showLogin ? (
@@ -304,12 +306,13 @@ const App: React.FC = () => {
           </div>
         ) : (
           <div className="w-full h-full animate-in fade-in duration-300">
-            <AdminDashboard 
-              candidates={candidates} 
-              votes={votes} 
-              onAddCandidate={addCandidate} 
-              onDeleteCandidate={deleteCandidate} 
+            <AdminDashboard
+              candidates={candidates}
+              votes={votes}
+              onAddCandidate={addCandidate}
+              onDeleteCandidate={deleteCandidate}
               onResetVotes={resetVotes}
+              onLogout={handleAdminToggle}
             />
           </div>
         )}
