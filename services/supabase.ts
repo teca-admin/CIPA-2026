@@ -1,6 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { Candidate, Vote } from '../types.ts';
+import { Candidate, Vote, Voter } from '../types.ts';
 
 const SUPABASE_URL = 'https://uvsmybibogezodlnazrp.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2c215Ymlib2dlem9kbG5henJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwODE2NDIsImV4cCI6MjA5ODY1NzY0Mn0.TZtgmjqTDbV4TRfeLujgIp11Z5pvDFw6bMqLbrQie-U';
@@ -92,9 +92,67 @@ export const clearAllVotes = async () => {
     .from('votes')
     .delete()
     .neq('id', '00000000-0000-0000-0000-000000000000');
-  
+
   if (error) {
     console.error('Erro ao resetar votos:', error);
     throw new Error(error.message);
   }
+};
+
+// --- Lista de Presença (Check-in) ---
+// Fica em tabela própria, sem nenhum vínculo com votes: garante que sabemos quem
+// compareceu sem nunca sabermos em quem essa pessoa votou.
+
+export const getVoters = async (): Promise<Voter[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('voters')
+      .select('id, matricula, name, has_voted, signed_at')
+      .order('name');
+
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      id: item.id,
+      matricula: item.matricula,
+      name: item.name,
+      hasVoted: item.has_voted,
+      signedAt: item.signed_at ? new Date(item.signed_at).getTime() : null
+    }));
+  } catch (error: any) {
+    console.error('Erro ao buscar lista de presença:', error);
+    throw new Error(`Erro de Banco: ${error.message}`);
+  }
+};
+
+export const importVoters = async (rows: { matricula: string; name: string }[]) => {
+  const { error } = await supabase
+    .from('voters')
+    .upsert(rows, { onConflict: 'matricula' });
+
+  if (error) {
+    console.error('Erro ao importar lista de presença:', error);
+    throw new Error(error.message);
+  }
+};
+
+// Confirma o check-in de forma atômica: só marca has_voted se ainda não tiver assinado.
+// Se outra estação já tiver confirmado essa matrícula um instante antes, retorna 0 linhas
+// e tratamos como "já assinou" em vez de deixar assinar duas vezes.
+export const confirmCheckin = async (matricula: string, signature: string) => {
+  const { data, error } = await supabase
+    .from('voters')
+    .update({ has_voted: true, signature, signed_at: new Date().toISOString() })
+    .eq('matricula', matricula)
+    .eq('has_voted', false)
+    .select('id, matricula, name');
+
+  if (error) {
+    console.error('Erro ao confirmar presença:', error);
+    throw new Error(error.message);
+  }
+  if (!data || data.length === 0) {
+    throw new Error('Esta matrícula já assinou a lista de presença.');
+  }
+  return data[0];
 };

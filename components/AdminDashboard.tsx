@@ -1,8 +1,9 @@
 
-import React, { useState, useRef } from 'react';
-import { Candidate, Vote } from '../types.ts';
-import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock, FileSpreadsheet, Download, Ban, LogOut } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Candidate, Vote, Voter } from '../types.ts';
+import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image as ImageIcon, Upload, X, CheckCircle2, AlertTriangle, FileText, BarChart3, TrendingUp, History, Clock, FileSpreadsheet, Download, Ban, LogOut, ClipboardPaste, UserCheck, Link2, Copy, Check } from 'lucide-react';
 import { sanitizeImageUrl } from '../utils/urlHelper.ts';
+import * as db from '../services/supabase.ts';
 import * as XLSX from 'xlsx';
 
 interface AdminDashboardProps {
@@ -24,13 +25,92 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   onResetVotes,
   onLogout
 }) => {
-  const [activeTab, setActiveTab] = useState<'results' | 'candidates' | 'register' | 'logs'>('results');
+  const [activeTab, setActiveTab] = useState<'results' | 'candidates' | 'register' | 'logs' | 'attendance'>('results');
   const [newName, setNewName] = useState('');
   const [newNumber, setNewNumber] = useState('');
   const [newPhotoBase64, setNewPhotoBase64] = useState('');
   const [isUploading, setIsUploading] = useState(false);
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [voters, setVoters] = useState<Voter[]>([]);
+  const [isLoadingVoters, setIsLoadingVoters] = useState(true);
+  const [pasteText, setPasteText] = useState('');
+  const [parsedRows, setParsedRows] = useState<{ matricula: string; name: string }[]>([]);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+  const [importSuccess, setImportSuccess] = useState<string | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const checkinUrl = `${window.location.origin}${window.location.pathname}?checkin`;
+
+  const handleCopyCheckinUrl = () => {
+    navigator.clipboard.writeText(checkinUrl).then(() => {
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    });
+  };
+
+  const loadVoters = async () => {
+    try {
+      setIsLoadingVoters(true);
+      setVoters(await db.getVoters());
+    } catch (err: any) {
+      console.error('Erro ao buscar lista de presença:', err);
+    } finally {
+      setIsLoadingVoters(false);
+    }
+  };
+
+  useEffect(() => {
+    loadVoters();
+  }, []);
+
+  // Aceita colar direto do Excel (colunas separadas por tab, vírgula ou ponto-e-vírgula).
+  // Detecta automaticamente qual coluna é a matrícula (numérica) e qual é o nome.
+  const handleParsePaste = () => {
+    setParseError(null);
+    const lines = pasteText.split('\n').map(l => l.trim()).filter(Boolean);
+    const rows: { matricula: string; name: string }[] = [];
+
+    for (const line of lines) {
+      const parts = line.split(/\t|,|;/).map(p => p.trim()).filter(Boolean);
+      if (parts.length < 2) continue;
+
+      const [first, second] = parts;
+      const firstIsNumeric = /^\d+$/.test(first.replace(/\D/g, '')) && /\d/.test(first);
+      const matricula = firstIsNumeric ? first : second;
+      const name = firstIsNumeric ? second : first;
+      if (matricula && name) rows.push({ matricula, name });
+    }
+
+    if (rows.length === 0) {
+      setParseError('Não consegui identificar linhas válidas. Cada linha precisa ter matrícula e nome separados por tab, vírgula ou ponto-e-vírgula.');
+      setParsedRows([]);
+      return;
+    }
+    setParsedRows(rows);
+  };
+
+  const handleImportVoters = async () => {
+    if (parsedRows.length === 0) return;
+    try {
+      setIsImporting(true);
+      setParseError(null);
+      await db.importVoters(parsedRows);
+      setImportSuccess(`${parsedRows.length} colaborador(es) importado(s) com sucesso.`);
+      setPasteText('');
+      setParsedRows([]);
+      loadVoters();
+    } catch (err: any) {
+      setParseError(err.message || 'Falha ao importar a lista.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
+
+  const totalVoters = voters.length;
+  const signedVoters = voters.filter(v => v.hasVoted);
 
   // Função para formatar a exibição do horário na tela
   const displayTime = (v: Vote) => {
@@ -199,6 +279,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
         {[
           { id: 'results', label: 'Apuração', icon: BarChart3 },
           { id: 'logs', label: 'Histórico (Manaus)', icon: History },
+          { id: 'attendance', label: 'Lista de Presença', icon: UserCheck },
           { id: 'candidates', label: 'Candidatos', icon: Users },
           { id: 'register', label: 'Cadastro', icon: Plus },
         ].map((tab) => (
@@ -364,7 +445,161 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
             </div>
           )}
 
-          {activeTab === 'candidates' && ( 
+          {activeTab === 'attendance' && (
+            <div className="space-y-6">
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm p-6">
+                <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2 mb-3">
+                  <Link2 className="w-4 h-4 text-indigo-500" />
+                  Link do Tablet de Check-in
+                </h2>
+                <p className="text-xs text-slate-400 mb-4">
+                  Abra este link no tablet ao lado da urna. Não precisa de senha de admin.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    readOnly
+                    value={checkinUrl}
+                    onFocus={(e) => e.target.select()}
+                    className="flex-1 px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs text-slate-600"
+                  />
+                  <button
+                    onClick={handleCopyCheckinUrl}
+                    className="px-4 py-3 bg-indigo-600 text-white rounded-lg text-xs font-black uppercase flex items-center gap-2 hover:bg-indigo-700 transition-colors shrink-0"
+                  >
+                    {linkCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    {linkCopied ? 'Copiado' : 'Copiar'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-indigo-600 p-6 rounded-xl text-white shadow-lg">
+                  <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Colaboradores na Lista</p>
+                  <h3 className="text-4xl font-black font-mono">{totalVoters}</h3>
+                </div>
+                <div className="bg-slate-800 p-6 rounded-xl text-white shadow-lg">
+                  <p className="text-xs font-bold opacity-80 uppercase tracking-widest mb-1">Já Assinaram</p>
+                  <h3 className="text-4xl font-black font-mono">{signedVoters.length}</h3>
+                </div>
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                  <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Comparecimento</p>
+                  <h3 className="text-4xl font-black font-mono text-slate-900">
+                    {totalVoters > 0 ? ((signedVoters.length / totalVoters) * 100).toFixed(1) : '0'}%
+                  </h3>
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <h2 className="text-sm font-bold text-slate-700 flex items-center gap-2">
+                    <ClipboardPaste className="w-4 h-4 text-indigo-500" />
+                    Importar Colaboradores (colar da planilha)
+                  </h2>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Cole as linhas copiadas do Excel (matrícula e nome, em qualquer ordem, separados por tab ou vírgula). Importar de novo não apaga quem já assinou.
+                  </p>
+                </div>
+                <div className="p-6 space-y-3">
+                  <textarea
+                    value={pasteText}
+                    onChange={(e) => { setPasteText(e.target.value); setImportSuccess(null); }}
+                    placeholder={"1001\tJoão da Silva\n1002\tMaria Souza"}
+                    rows={6}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-lg font-mono text-xs outline-none focus:border-indigo-500 transition-all"
+                  />
+                  {parseError && (
+                    <p className="text-red-600 text-xs font-bold flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> {parseError}
+                    </p>
+                  )}
+                  {importSuccess && (
+                    <p className="text-emerald-600 text-xs font-bold flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5" /> {importSuccess}
+                    </p>
+                  )}
+                  <button
+                    onClick={handleParsePaste}
+                    disabled={!pasteText.trim()}
+                    className="px-4 py-2 bg-slate-800 text-white rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-slate-700 transition-colors disabled:opacity-40"
+                  >
+                    Processar Texto
+                  </button>
+
+                  {parsedRows.length > 0 && (
+                    <div className="border border-slate-200 rounded-lg overflow-hidden mt-4">
+                      <div className="px-4 py-2 bg-slate-50 text-xs font-bold text-slate-600">
+                        Pré-visualização: {parsedRows.length} linha(s) reconhecida(s)
+                      </div>
+                      <div className="max-h-48 overflow-auto">
+                        <table className="w-full text-left text-xs">
+                          <tbody className="divide-y divide-slate-50">
+                            {parsedRows.slice(0, 20).map((row, i) => (
+                              <tr key={i}>
+                                <td className="px-4 py-1.5 font-mono text-indigo-600 font-bold">{row.matricula}</td>
+                                <td className="px-4 py-1.5 text-slate-600">{row.name}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {parsedRows.length > 20 && (
+                          <div className="px-4 py-1.5 text-[10px] text-slate-400">
+                            + {parsedRows.length - 20} linha(s) não mostradas na pré-visualização
+                          </div>
+                        )}
+                      </div>
+                      <div className="p-3 bg-slate-50 border-t border-slate-100">
+                        <button
+                          onClick={handleImportVoters}
+                          disabled={isImporting}
+                          className="w-full bg-indigo-600 text-white font-bold py-2.5 rounded-md text-xs uppercase disabled:opacity-50"
+                        >
+                          {isImporting ? 'Importando...' : `Confirmar Importação (${parsedRows.length})`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                  <h2 className="text-sm font-bold text-slate-700">Colaboradores que já assinaram</h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase">
+                        <th className="px-6 py-4">Nome</th>
+                        <th className="px-6 py-4">Matrícula</th>
+                        <th className="px-6 py-4">Horário</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {isLoadingVoters ? (
+                        <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400 text-sm">Carregando...</td></tr>
+                      ) : signedVoters.length === 0 ? (
+                        <tr><td colSpan={3} className="px-6 py-8 text-center text-slate-400 text-sm">Ninguém assinou a lista ainda.</td></tr>
+                      ) : (
+                        signedVoters
+                          .sort((a, b) => (b.signedAt || 0) - (a.signedAt || 0))
+                          .map(v => (
+                            <tr key={v.id} className="hover:bg-slate-50/50 transition-colors">
+                              <td className="px-6 py-3 text-xs font-bold text-slate-600 uppercase">{v.name}</td>
+                              <td className="px-6 py-3 font-mono text-xs font-bold text-indigo-600">{v.matricula}</td>
+                              <td className="px-6 py-3 font-mono text-xs text-slate-400">
+                                {v.signedAt ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Manaus', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(v.signedAt)) : '--'}
+                              </td>
+                            </tr>
+                          ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'candidates' && (
             <div className="bg-white border border-slate-200 rounded-lg shadow-sm">
               <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
                 <h2 className="text-sm font-bold text-slate-700">Gestão de Candidatos</h2>

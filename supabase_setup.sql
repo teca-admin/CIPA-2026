@@ -24,6 +24,19 @@ CREATE TABLE IF NOT EXISTS public.votes (
     timestamp_manaus TIMESTAMP GENERATED ALWAYS AS (timestamp AT TIME ZONE 'America/Manaus') STORED
 );
 
--- 3. Limpeza de Políticas de Segurança (para ambiente de eleição simplificado)
+-- 3. Tabela de Lista de Presença (Check-in)
+-- Guarda quem já assinou a presença (com assinatura digital), SEM nenhum vínculo com a tabela votes.
+-- Isso preserva o sigilo do voto: sabemos quem compareceu, nunca em quem votou.
+CREATE TABLE IF NOT EXISTS public.voters (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    matricula TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    has_voted BOOLEAN NOT NULL DEFAULT FALSE,
+    signature TEXT,
+    signed_at TIMESTAMPTZ
+);
+
+-- 4. Limpeza de Políticas de Segurança (para ambiente de eleição simplificado)
 ALTER TABLE public.candidates DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.votes DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.voters DISABLE ROW LEVEL SECURITY;
