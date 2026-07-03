@@ -2,8 +2,8 @@
 import { createClient } from '@supabase/supabase-js';
 import { Candidate, Vote } from '../types.ts';
 
-const SUPABASE_URL = 'https://hxwiuxpqvowahmcfnreg.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh4d2l1eHBxdm93YWhtY2ZucmVnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njg5MDg0MDMsImV4cCI6MjA4NDQ4NDQwM30.Z3l4vSAhLHmyZE-ZUfBZ69Qh-agfiu7ePjjzziw_36Y';
+const SUPABASE_URL = 'https://uvsmybibogezodlnazrp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InV2c215Ymlib2dlem9kbG5henJwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwODE2NDIsImV4cCI6MjA5ODY1NzY0Mn0.TZtgmjqTDbV4TRfeLujgIp11Z5pvDFw6bMqLbrQie-U';
 
 export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 

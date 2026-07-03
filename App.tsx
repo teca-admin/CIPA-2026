@@ -9,8 +9,8 @@ import * as db from './services/supabase.ts';
 import { ShieldCheck, LogOut, Lock, LogIn, AlertCircle, RefreshCw, Settings as SettingsIcon, Ban, Clock } from 'lucide-react';
 
 const ADMIN_PASSWORD = 'wfsteca1';
-// Deadline: 31/01/2026 às 00:00:00 (O sistema trava assim que o dia 30 terminar)
-const ELECTION_DEADLINE = new Date('2026-01-31T00:00:00').getTime();
+// Deadline da eleição anterior já passou. Ajuste esta data antes de abrir a votação da nova eleição.
+const ELECTION_DEADLINE = new Date('2099-01-01T00:00:00').getTime();
 
 const App: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>(ViewMode.VOTING);
@@ -288,7 +288,7 @@ const App: React.FC = () => {
               </div>
               <div className="flex flex-col items-center lg:pt-8">
                 <div className="mb-8 text-center border-2 border-gray-400 p-[22px] bg-gray-200/50 rounded-sm">
-                   <div className="text-gray-500 text-[13px] font-bold uppercase tracking-[0.2em]">CIPA 2026</div>
+                   <div className="text-gray-500 text-[13px] font-bold uppercase tracking-[0.2em]">CIPA DIGITAL</div>
                 </div>
                 <Keypad 
                   onNumberClick={handleNumberClick} 
