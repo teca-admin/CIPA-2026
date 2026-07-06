@@ -5,6 +5,7 @@ import { Trash2, Plus, Users, Vote as VoteIcon, LayoutDashboard, Settings, Image
 import { sanitizeImageUrl } from '../utils/urlHelper.ts';
 import * as db from '../services/supabase.ts';
 import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
 
 interface AdminDashboardProps {
   candidates: Candidate[];
@@ -41,6 +42,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
   const [isImporting, setIsImporting] = useState(false);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
   const checkinUrl = `${window.location.origin}${window.location.pathname}?checkin`;
 
@@ -180,6 +183,98 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
     ];
 
     XLSX.writeFile(wb, `auditoria_cipa_manaus_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const exportAttendanceToExcel = () => {
+    const attendanceData = [...voters]
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(v => ({
+        "Nome": v.name,
+        "Matrícula": v.matricula,
+        "Assinou": v.hasVoted ? 'Sim' : 'Não',
+        "Data/Hora (Manaus)": v.signedAt
+          ? new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Manaus', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(v.signedAt))
+          : ''
+      }));
+
+    const ws = XLSX.utils.json_to_sheet(attendanceData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Lista de Presença CIPA");
+
+    ws['!cols'] = [
+      { wch: 40 }, // Nome
+      { wch: 15 }, // Matrícula
+      { wch: 12 }, // Assinou
+      { wch: 25 }  // Data/Hora
+    ];
+
+    XLSX.writeFile(wb, `lista_presenca_cipa_${new Date().toISOString().split('T')[0]}.xlsx`);
+  };
+
+  const formatSignedAt = (signedAt: number | null) => {
+    if (!signedAt) return '';
+    return new Intl.DateTimeFormat('pt-BR', { timeZone: 'America/Manaus', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date(signedAt));
+  };
+
+  // Exporta em PDF (não Excel) porque a assinatura é uma imagem, e o xlsx
+  // (versão gratuita) não sabe embutir imagens dentro de uma planilha.
+  // Traz TODOS os colaboradores da lista, assinado ou não (data e assinatura ficam
+  // em branco pra quem ainda não compareceu).
+  const exportSignaturesToPdf = async () => {
+    try {
+      setIsGeneratingPdf(true);
+      setPdfError(null);
+      const allVoters = await db.getVotersWithSignatures();
+
+      const doc = new jsPDF();
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const rowHeight = 34;
+      let y = 20;
+
+      doc.setFontSize(14);
+      doc.text('Lista de Presença CIPA', 14, y);
+      y += 10;
+
+      for (let i = 0; i < allVoters.length; i++) {
+        const v = allVoters[i];
+
+        if (y + rowHeight > pageHeight - 10) {
+          doc.addPage();
+          y = 20;
+        }
+
+        doc.setFontSize(10);
+        const dateLabel = v.signedAt ? formatSignedAt(v.signedAt) : 'Pendente';
+        doc.text(`${v.name}  •  Matrícula ${v.matricula}  •  ${dateLabel}`, 14, y, { maxWidth: pageWidth - 28 });
+
+        if (v.signature) {
+          try {
+            doc.addImage(v.signature, 'PNG', 14, y + 3, 60, 22);
+          } catch {
+            // Assinatura corrompida ou em formato inesperado: segue sem travar o relatório inteiro.
+          }
+        } else {
+          doc.setFontSize(8);
+          doc.setTextColor(150);
+          doc.text('(sem assinatura)', 14, y + 12);
+          doc.setTextColor(0);
+        }
+
+        y += rowHeight;
+
+        // Cede o event loop a cada 20 linhas pra não travar a aba com listas grandes.
+        if (i % 20 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 0));
+        }
+      }
+
+      doc.save(`lista_presenca_cipa_${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (err: any) {
+      setPdfError(err.message || 'Falha ao gerar o PDF da lista.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -562,8 +657,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({
               </div>
 
               <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50">
+                <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center gap-3 flex-wrap">
                   <h2 className="text-sm font-bold text-slate-700">Colaboradores que já assinaram</h2>
+                  <div className="flex items-center gap-2">
+                    {pdfError && <span className="text-red-600 text-[10px] font-bold">{pdfError}</span>}
+                    <button
+                      onClick={exportSignaturesToPdf}
+                      disabled={totalVoters === 0 || isGeneratingPdf}
+                      className="flex items-center gap-2 px-3 py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-indigo-100 transition-colors shadow-sm disabled:opacity-40"
+                      title="Exportar todos os colaboradores em PDF, com nome, data e imagem da assinatura"
+                    >
+                      <FileText className="w-4 h-4" /> {isGeneratingPdf ? 'Gerando...' : 'PDF (Lista Completa)'}
+                    </button>
+                    <button
+                      onClick={exportAttendanceToExcel}
+                      disabled={totalVoters === 0}
+                      className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-md text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-colors shadow-sm disabled:opacity-40"
+                      title="Exportar lista completa (incluindo quem ainda não assinou)"
+                    >
+                      <FileSpreadsheet className="w-4 h-4" /> Excel (Lista Completa)
+                    </button>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">

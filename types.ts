@@ -20,6 +20,7 @@ export interface Voter {
   name: string;
   hasVoted: boolean;
   signedAt: number | null;
+  signature?: string | null;
 }
 
 export enum ViewMode {

@@ -64,10 +64,17 @@ const CheckinScreen: React.FC = () => {
   };
 
   // Chamado a partir de um clique do usuário (form submit), por isso o navegador
-  // ainda permite pedir tela cheia / travar orientação aqui.
-  const enterSignatureFullscreen = () => {
-    document.documentElement.requestFullscreen?.().catch(() => {});
-    (screen.orientation as any)?.lock?.('landscape').catch(() => {});
+  // ainda permite pedir tela cheia / travar orientação aqui. Espera tudo se
+  // estabilizar ANTES de mostrar o canvas, pra essa transição não disparar um
+  // resize no meio da assinatura (o que limparia o desenho).
+  const enterSignatureFullscreen = async () => {
+    try {
+      await document.documentElement.requestFullscreen?.();
+    } catch {}
+    try {
+      await (screen.orientation as any)?.lock?.('landscape');
+    } catch {}
+    await new Promise(resolve => setTimeout(resolve, 300));
   };
 
   const exitSignatureFullscreen = () => {
@@ -75,7 +82,7 @@ const CheckinScreen: React.FC = () => {
     (screen.orientation as any)?.unlock?.();
   };
 
-  const handleConfirmMatricula = (e: React.FormEvent) => {
+  const handleConfirmMatricula = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedVoter) return;
 
@@ -88,7 +95,7 @@ const CheckinScreen: React.FC = () => {
       return;
     }
     setConfirmError(null);
-    enterSignatureFullscreen();
+    await enterSignatureFullscreen();
     setStep('signature');
   };
 
@@ -145,7 +152,11 @@ const CheckinScreen: React.FC = () => {
   useEffect(() => {
     if (step !== 'signature') return;
 
+    // Redimensionar o canvas (mudar width/height) apaga tudo que estava desenhado.
+    // Uma vez que a pessoa já começou a assinar, ignoramos qualquer resize/rotação
+    // subsequente pra não apagar a assinatura no meio do traço.
     const resizeCanvas = () => {
+      if (hasSignatureRef.current) return;
       const canvas = canvasRef.current;
       if (!canvas) return;
       const ratio = window.devicePixelRatio || 1;
@@ -154,9 +165,9 @@ const CheckinScreen: React.FC = () => {
       canvas.height = rect.height * ratio;
       const ctx = canvas.getContext('2d');
       ctx?.scale(ratio, ratio);
-      hasSignatureRef.current = false;
     };
 
+    hasSignatureRef.current = false;
     // Roda no próximo frame: entrar em fullscreen/travar orientação muda o
     // tamanho da tela um instante depois de renderizar o canvas.
     requestAnimationFrame(resizeCanvas);

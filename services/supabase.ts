@@ -125,6 +125,33 @@ export const getVoters = async (): Promise<Voter[]> => {
   }
 };
 
+// Busca a lista completa (assinado ou não) com a imagem da assinatura, só sob
+// demanda (gerar o relatório em PDF), não no carregamento normal do painel:
+// com milhares de colaboradores, as imagens em base64 deixariam a lista lenta
+// pra carregar à toa.
+export const getVotersWithSignatures = async (): Promise<Voter[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('voters')
+      .select('id, matricula, name, has_voted, signed_at, signature')
+      .order('name');
+
+    if (error) throw error;
+
+    return (data || []).map(item => ({
+      id: item.id,
+      matricula: item.matricula,
+      name: item.name,
+      hasVoted: item.has_voted,
+      signedAt: item.signed_at ? new Date(item.signed_at).getTime() : null,
+      signature: item.signature
+    }));
+  } catch (error: any) {
+    console.error('Erro ao buscar assinaturas:', error);
+    throw new Error(`Erro de Banco: ${error.message}`);
+  }
+};
+
 export const importVoters = async (rows: { matricula: string; name: string }[]) => {
   const { error } = await supabase
     .from('voters')
